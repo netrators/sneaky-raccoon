@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Trash Panda: Sigilo Urbano</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root { --accent: #f59e0b; --bg-dark: #050508; }
+        body, html { margin: 0; padding: 0; overflow: hidden; background-color: var(--bg-dark); touch-action: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; -webkit-user-select: none; }
+        #game-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+        .interactive { pointer-events: auto; }
+        
+        /* Menús - Adaptables a cualquier pantalla */
+        .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(5, 5, 8, 0.90); backdrop-filter: blur(8px); transition: opacity 0.4s ease; padding: 20px; text-align: center; }
+        .hidden { opacity: 0; pointer-events: none; display: none !important; }
+        
+        /* Tipografía Fluida (clamp) para evitar desbordes en móviles */
+        .title-text { font-size: clamp(3rem, 10vw, 6rem); font-weight: 800; color: white; letter-spacing: 0.1em; text-shadow: 0 0 25px rgba(255,255,255,0.1); margin-bottom: 0.5rem; line-height: 1.1; }
+        .subtitle-text { font-size: clamp(1rem, 4vw, 1.5rem); color: #9ca3af; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 2rem; }
+        
+        /* Botones Minimalistas robustos */
+        .btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2); color: #e5e7eb; padding: clamp(10px, 2vh, 16px) clamp(20px, 4vw, 32px); font-size: clamp(1rem, 2.5vw, 1.2rem); text-transform: uppercase; letter-spacing: 2px; cursor: pointer; transition: all 0.2s; margin: 8px; min-width: 60%; max-width: 300px; border-radius: 8px; backdrop-filter: blur(4px); }
+        .btn:hover, .btn:active { background: #e5e7eb; color: var(--bg-dark); border-color: #e5e7eb; transform: scale(1.02); }
+        .btn.active { border-color: var(--accent); color: var(--accent); background: rgba(245, 158, 11, 0.1); }
+        .btn.active:hover { background: var(--accent); color: var(--bg-dark); }
+        .btn-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%; max-width: 400px; }
+        .btn-group .btn { min-width: 0; flex: 1 1 30%; }
+
+        /* HUD - Espaciado seguro para notches */
+        #hud { padding: clamp(10px, 4vw, 30px); padding-top: max(20px, env(safe-area-inset-top)); display: flex; justify-content: space-between; align-items: flex-start; width: 100%; box-sizing: border-box; }
+        .hud-text { font-size: clamp(1.2rem, 3.5vw, 1.8rem); font-weight: bold; color: rgba(255,255,255,0.9); text-shadow: 2px 2px 4px rgba(0,0,0,0.8); display: flex; align-items: center; }
+        
+        /* Barra de progreso integrada al jugador (Posición absoluta central) */
+        #action-container { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); width: clamp(150px, 30vw, 250px); text-align: center; display: none; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+        #action-text { color: white; margin-bottom: 8px; font-weight: 700; text-shadow: 0px 2px 4px black; font-size: clamp(0.9rem, 2vw, 1.2rem); letter-spacing: 1px;}
+        #action-bar-bg { width: 100%; height: clamp(8px, 1.5vh, 12px); background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.8); border-radius: 6px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #action-bar-fill { width: 0%; height: 100%; background: var(--accent); box-shadow: 0 0 10px var(--accent); transition: width 0.05s linear; }
+
+        /* Controles táctiles - Posicionamiento dinámico */
+        #touch-controls { position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; pointer-events: none; display: none; }
+        
+        .joystick-base { position: absolute; bottom: clamp(20px, 8vh, 50px); left: clamp(20px, 8vw, 50px); width: clamp(100px, 25vmin, 150px); height: clamp(100px, 25vmin, 150px); background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.15) 100%); border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; touch-action: none; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        .joystick-knob { width: 40%; height: 40%; background: rgba(255,255,255,0.7); border-radius: 50%; pointer-events: none; box-shadow: 0 5px 15px rgba(0,0,0,0.4); transition: transform 0.05s; }
+        
+        #btn-action-touch { position: absolute; bottom: clamp(20px, 8vh, 50px); right: clamp(20px, 8vw, 50px); width: clamp(80px, 20vmin, 120px); height: clamp(80px, 20vmin, 120px); background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; color: white; font-weight: bold; font-size: clamp(0.8rem, 2.5vw, 1.2rem); display: flex; align-items: center; justify-content: center; touch-action: none; opacity: 0.5; transition: opacity 0.2s, background 0.1s, transform 0.1s; backdrop-filter: blur(2px); }
+        #btn-action-touch.highlight { opacity: 1; border-color: var(--accent); color: var(--accent); box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+        #btn-action-touch:active, #btn-action-touch.active-touch { background: rgba(245, 158, 11, 0.3); transform: scale(0.95); }
+
+        /* Indicadores visuales HUD */
+        .status-pill { display: flex; align-items: center; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        #status-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #10b981; margin-right: 12px; box-shadow: 0 0 10px #10b981; transition: background-color 0.3s, box-shadow 0.3s;}
+        .status-danger { background-color: #ef4444 !important; box-shadow: 0 0 20px #ef4444 !important; }
+        .status-warning { background-color: #f59e0b !important; box-shadow: 0 0 15px #f59e0b !important; }
+
+        #pc-instructions { position: absolute; bottom: 20px; width: 100%; text-align: center; color: rgba(255,255,255,0.4); font-size: clamp(0.7rem, 1.5vw, 0.9rem); letter-spacing: 1px; }
+        
+        /* Animación de alerta */
+        @keyframes pulseAlert { 0% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); text-shadow: 0 0 20px red; } 100% { opacity: 0.5; transform: scale(1); } }
+        .alert-anim { animation: pulseAlert 0.5s infinite; color: #ef4444 !important; }
+    </style>
+</head>
+<body>
+    <div id="game-canvas"></div>
+
+    <div id="ui-layer">
+        <!-- HUD durante el juego -->
+        <div id="hud" class="hidden">
+            <div class="status-pill interactive">
+                <div id="status-dot"></div>
+                <div class="hud-text"><span id="score-display">0 / 5</span>&nbsp;<span class="text-sm font-normal text-gray-400">Bolsas</span></div>
+            </div>
+            <div class="status-pill interactive">
+                <div class="hud-text text-gray-300">Nvl <span id="level-display" class="text-white ml-2">1</span></div>
+            </div>
+        </div>
+
+        <!-- Indicador central de acción (Flota sobre el personaje 3D) -->
+        <div id="action-container">
+            <div id="action-text">MANTÉN PARA URGAR</div>
+            <div id="action-bar-bg"><div id="action-bar-fill"></div></div>
+        </div>
+
+        <div id="pc-instructions" class="hidden">MOVIMIENTO: WASD / FLECHAS | URGAR: ESPACIO</div>
+
+        <!-- Controles Móviles -->
+        <div id="touch-controls">
+            <div id="joystick-zone" class="joystick-base interactive"><div id="joystick-knob" class="joystick-knob"></div></div>
+            <div id="btn-action-touch" class="interactive">URGAR</div>
+        </div>
+
+        <!-- Pantallas de Menú -->
+        <div id="screen-main" class="screen interactive">
+            <h1 class="title-text">TRASH<span style="color: var(--accent)">PANDA</span></h1>
+            <p class="subtitle-text">Sigilo Urbano 2.0</p>
+            <button id="btn-play" class="btn">Iniciar Noche</button>
+            <button id="btn-settings" class="btn">Configuración</button>
+        </div>
+
+        <div id="screen-settings" class="screen hidden interactive">
+            <h2 class="title-text" style="font-size: clamp(2rem, 6vw, 4rem);">Ajustes</h2>
+            <div class="flex flex-col items-center mb-8 w-full">
+                <p class="text-gray-400 mb-4 text-sm tracking-widest uppercase">Nivel de Alerta</p>
+                <div class="btn-group">
+                    <button class="btn btn-diff active" data-diff="easy">Relajado</button>
+                    <button class="btn btn-diff" data-diff="normal">Normal</button>
+                    <button class="btn btn-diff" data-diff="hard">Tenso</button>
+                </div>
+            </div>
+            <button id="btn-toggle-sound" class="btn mb-8">Sonido: ON</button>
+            <button id="btn-back" class="btn" style="border-color: rgba(255,255,255,0.1);">Volver</button>
+        </div>
+
+        <div id="screen-gameover" class="screen hidden interactive">
+            <h1 class="title-text text-red-500">¡ATRAPADO!</h1>
+            <p class="subtitle-text text-gray-300">Las luces te delataron.</p>
+            <div class="status-pill mb-8 text-xl px-6 py-3">Nivel alcanzado: <span id="final-level" class="text-white font-bold ml-2">1</span></div>
+            <button id="btn-retry" class="btn">Intentar de nuevo</button>
+            <button id="btn-menu-from-lose" class="btn" style="background: transparent;">Menú Principal</button>
+        </div>
+
+        <div id="screen-win" class="screen hidden interactive">
+            <h1 class="title-text text-green-400" style="font-size: clamp(2.5rem, 8vw, 5rem);">¡ZONA LIMPIA!</h1>
+            <p class="subtitle-text">Basura saqueada con éxito.</p>
+            <button id="btn-next-level" class="btn active" style="margin-top: 2rem;">Siguiente Calle</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * SINTETIZADOR DE AUDIO (Web Audio API)
+         * Genera todos los efectos y música ambiental matemáticamente.
+         */
+        class AudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+                this.bgmOsc = null;
+                this.bgmGain = null;
+                this.lfo = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+
+            playTone(freq, type, duration, vol = 0.1, slideFreq = null) {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                if (slideFreq) {
+                    osc.frequency.exponentialRampToValueAtTime(slideFreq, this.ctx.currentTime + duration);
+                }
+                
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+
+            playNoise(duration, vol = 0.1, filterFreq = 1000) {
+                if (!this.enabled || !this.ctx) return;
+                const bufferSize = this.ctx.sampleRate * duration;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = filterFreq;
+                filter.Q.value = 0.5;
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            }
+
+            startBGM() {
+                if (!this.enabled || !this.ctx || this.bgmOsc) return;
+                
+                // Tono drone oscuro
+                this.bgmOsc = this.ctx.createOscillator();
+                this.bgmGain = this.ctx.createGain();
+                this.bgmOsc.type = 'sine';
+                this.bgmOsc.frequency.value = 60; 
+                
+                // Modulación para dar sensación de suspenso
+                this.lfo = this.ctx.createOscillator();
+                this.lfo.type = 'sine';
+                this.lfo.frequency.value = 0.15;
+                const lfoGain = this.ctx.createGain();
+                lfoGain.gain.value = 0.04;
+                
+                this.lfo.connect(lfoGain);
+                lfoGain.connect(this.bgmGain.gain);
+                
+                this.bgmGain.gain.value = 0.06;
+                this.bgmOsc.connect(this.bgmGain);
+                this.bgmGain.connect(this.ctx.destination);
+                
+                this.bgmOsc.start();
+                this.lfo.start();
+            }
+
+            stopBGM() {
+                if (this.bgmOsc) {
+                    this.bgmOsc.stop();
+                    this.bgmOsc.disconnect();
+                    this.lfo.stop();
+                    this.lfo.disconnect();
+                    this.bgmOsc = null;
+                }
+            }
+
+            sfxStep() { this.playNoise(0.04, 0.03, 400); }
+            sfxRummage() { this.playNoise(0.15, 0.2, 800 + Math.random()*400); }
+            sfxSuccess() { 
+                this.playTone(523.25, 'sine', 0.1, 0.15); // C5
+                setTimeout(() => this.playTone(659.25, 'sine', 0.2, 0.15), 100); // E5
+                setTimeout(() => this.playTone(783.99, 'sine', 0.4, 0.15), 200); // G5
+            }
+            sfxCaught() { 
+                this.playTone(200, 'sawtooth', 0.5, 0.3, 50); // Caída abrupta
+                this.playNoise(0.5, 0.4, 300);
+            }
+            sfxAlert() { this.playTone(800, 'square', 0.1, 0.05); }
+        }
+
+        const audio = new AudioEngine();
+
+        const GAME_STATE = { MENU: 0, PLAYING: 1, GAMEOVER: 2, WIN: 3 };
+        
+        let state = {
+            current: GAME_STATE.MENU,
+            level: 1,
+            score: 0,
+            targetScore: 3,
+            difficulty: 'easy',
+            isRummaging: false,
+            rummageProgress: 0,
+            exposureLevel: 0,
+            lastTime: 0,
+            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        };
+
+        const config = {
+            easy: { carFreq: 0.003, lightRadius: 4.5, detectSpeed: 0.4, walkSpeed: 7.0 },
+            normal: { carFreq: 0.010, lightRadius: 5.5, detectSpeed: 0.8, walkSpeed: 6.5 },
+            hard: { carFreq: 0.025, lightRadius: 7.0, detectSpeed: 1.5, walkSpeed: 6.0 }
+        };
+
+        // Inputs (Analógico y Digital)
+        const keys = { w: false, a: false, s: false, d: false, space: false };
+        let joystick = { x: 0, y: 0, length: 0, active: false }; // length 0.0 a 1.0
+
+        // Variables Three.js
+        let scene, camera, renderer, clock;
+        let playerObj, playerRig; 
+        let trashCans = [], streetLights = [], cars = [], particles = [];
+        let mapSize = { w: 60, h: 70 };
+        
+        // Materiales Reutilizables (Optimización)
+        const mats = {
+            asphalt: new THREE.MeshStandardMaterial({ color: 0x1a1a1f, roughness: 0.8, metalness: 0.1 }),
+            sidewalk: new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.9 }),
+            building: new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 1.0 }),
+            trashFull: new THREE.MeshStandardMaterial({ color: 0x1d4727, roughness: 0.6 }),
+            trashEmpty: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 }),
+            raccoonDark: new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.8 }),
+            raccoonLight: new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.9 }),
+            raccoonBlack: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.7 }),
+            carBody: new THREE.MeshStandardMaterial({ color: 0x442222, roughness: 0.4, metalness: 0.6 })
+        };
+
+        function initThreeJS() {
+            const container = document.getElementById('game-canvas');
+            clock = new THREE.Clock();
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050508);
+            scene.fog = new THREE.FogExp2(0x050508, 0.025); // Niebla atmosférica
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 150);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limitar pixel ratio para rendimiento
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Luces Globales (Ambiente oscuro)
+            const ambientLight = new THREE.AmbientLight(0x202535, 0.3);
+            scene.add(ambientLight);
+
+            // Luz de Luna (Direccional sutil)
+            const moonLight = new THREE.DirectionalLight(0x405070, 0.4);
+            moonLight.position.set(20, 40, -30);
+            moonLight.castShadow = true;
+            moonLight.shadow.mapSize.width = 1024;
+            moonLight.shadow.mapSize.height = 1024;
+            moonLight.shadow.camera.near = 1;
+            moonLight.shadow.camera.far = 100;
+            const d = 35;
+            moonLight.shadow.camera.left = -d; moonLight.shadow.camera.right = d;
+            moonLight.shadow.camera.top = d; moonLight.shadow.camera.bottom = -d;
+            moonLight.shadow.bias = -0.001;
+            scene.add(moonLight);
+
+            createEnvironment();
+            createRaccoon();
+
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        // Genera textura a rayas para la cola usando un Canvas HTML
+        function createTailTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2b2b2b'; ctx.fillRect(0, 0, 64, 128);
+            ctx.fillStyle = '#0a0a0a';
+            for (let i = 0; i < 5; i++) {
+                ctx.fillRect(0, i * 26 + 10, 64, 12);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
+        }
+
+        function createEnvironment() {
+            // Suelo (Asfalto detallado)
+            const streetGeo = new THREE.PlaneGeometry(mapSize.w, mapSize.h);
+            const street = new THREE.Mesh(streetGeo, mats.asphalt);
+            street.rotation.x = -Math.PI / 2;
+            street.receiveShadow = true;
+            scene.add(street);
+
+            // Aceras elevadas
+            const sidewalkGeo = new THREE.BoxGeometry(12, 0.4, mapSize.h);
+            const sidewalkL = new THREE.Mesh(sidewalkGeo, mats.sidewalk);
+            sidewalkL.position.set(-16, 0.2, 0);
+            sidewalkL.receiveShadow = true;
+            scene.add(sidewalkL);
+
+            const sidewalkR = new THREE.Mesh(sidewalkGeo, mats.sidewalk);
+            sidewalkR.position.set(16, 0.2, 0);
+            sidewalkR.receiveShadow = true;
+            scene.add(sidewalkR);
+
+            // Paredes (Edificios al fondo)
+            const wallGeo = new THREE.BoxGeometry(10, 15, mapSize.h);
+            const wallL = new THREE.Mesh(wallGeo, mats.building);
+            wallL.position.set(-27, 7.5, 0);
+            scene.add(wallL);
+
+            const wallR = new THREE.Mesh(wallGeo, mats.building);
+            wallR.position.set(27, 7.5, 0);
+            scene.add(wallR);
+        }
+
+        function createRaccoon() {
+            playerObj = new THREE.Group();
+            playerRig = { walkCycle: 0 }; // Estado de animación
+
+            // Cuerpo principal (perita)
+            const bodyGeo = new THREE.SphereGeometry(0.45, 16, 12);
+            bodyGeo.scale(1, 1, 1.3);
+            const body = new THREE.Mesh(bodyGeo, mats.raccoonDark);
+            body.position.y = 0.5;
+            body.castShadow = true;
+            playerObj.add(body);
+            playerRig.body = body;
+
+            // Cabeza
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0, 0.3, 0.5);
+            body.add(headGroup);
+            playerRig.head = headGroup;
+
+            const skullGeo = new THREE.SphereGeometry(0.3, 16, 12);
+            const skull = new THREE.Mesh(skullGeo, mats.raccoonLight);
+            skull.castShadow = true;
+            headGroup.add(skull);
+
+            // Hocico
+            const snoutGeo = new THREE.ConeGeometry(0.15, 0.3, 12);
+            snoutGeo.rotateX(Math.PI / 2);
+            const snout = new THREE.Mesh(snoutGeo, mats.raccoonLight);
+            snout.position.set(0, -0.05, 0.3);
+            headGroup.add(snout);
+
+            const noseGeo = new THREE.SphereGeometry(0.06, 8, 8);
+            const nose = new THREE.Mesh(noseGeo, mats.raccoonBlack);
+            nose.position.set(0, -0.05, 0.45);
+            headGroup.add(nose);
+
+            // Máscara de los ojos (Antifaz)
+            const maskGeo = new THREE.BoxGeometry(0.45, 0.15, 0.2);
+            const mask = new THREE.Mesh(maskGeo, mats.raccoonBlack);
+            mask.position.set(0, 0.08, 0.22);
+            // Curvar ligeramente el antifaz girando sus lados o insertando en la esfera (simplificado por rendimiento)
+            headGroup.add(mask);
+
+            // Orejas
+            const earGeo = new THREE.ConeGeometry(0.1, 0.2, 8);
+            const earL = new THREE.Mesh(earGeo, mats.raccoonDark);
+            earL.position.set(-0.2, 0.25, -0.1);
+            earL.rotation.set(-0.2, 0, 0.3);
+            headGroup.add(earL);
+            const earR = new THREE.Mesh(earGeo, mats.raccoonDark);
+            earR.position.set(0.2, 0.25, -0.1);
+            earR.rotation.set(-0.2, 0, -0.3);
+            headGroup.add(earR);
+
+            // Cola gruesa a rayas
+            const tailGeo = new THREE.CylinderGeometry(0.12, 0.2, 0.8, 12);
+            tailGeo.rotateX(Math.PI / 2); // Apuntar hacia atrás (Z local)
+            tailGeo.translate(0, 0, -0.4); // Mover pivote a la base
+            const matTail = createTailTexture();
+            const tail = new THREE.Mesh(tailGeo, matTail);
+            tail.position.set(0, 0, -0.4);
+            tail.castShadow = true;
+            body.add(tail);
+            playerRig.tail = tail;
+
+            // Extremidades (Función helper)
+            const createLimb = (x, y, z) => {
+                const group = new THREE.Group();
+                group.position.set(x, y, z);
+                const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.4, 8), mats.raccoonBlack);
+                mesh.position.y = -0.2; // Pivote en la parte superior
+                mesh.castShadow = true;
+                group.add(mesh);
+                body.add(group);
+                return group;
+            };
+
+            playerRig.legL = createLimb(-0.25, -0.1, -0.25);
+            playerRig.legR = createLimb(0.25, -0.1, -0.25);
+            playerRig.armL = createLimb(-0.25, -0.1, 0.25);
+            playerRig.armR = createLimb(0.25, -0.1, 0.25);
+
+            scene.add(playerObj);
+
+            // Datos físicos
+            playerObj.userData = {
+                velocity: new THREE.Vector3(),
+                baseSpeed: 6.0,
+                radius: 0.5
+            };
+        }
+
+        function generateLevel() {
+            // Limpieza robusta de objetos antiguos
+            const disposeObj = (obj) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material && !Object.values(mats).includes(obj.material)) obj.material.dispose();
+                scene.remove(obj);
+            };
+
+            trashCans.forEach(t => disposeObj(t));
+            streetLights.forEach(l => { disposeObj(l.mesh); disposeObj(l.light); disposeObj(l.area); scene.remove(l.target); });
+            cars.forEach(c => { scene.remove(c.mesh); scene.remove(c.light); scene.remove(c.light.target); });
+            particles.forEach(p => disposeObj(p.mesh));
+            
+            trashCans = []; streetLights = []; cars = []; particles = [];
+
+            state.score = 0;
+            state.targetScore = 3 + Math.floor(state.level * 1.5);
+            state.exposureLevel = 0;
+            updateHUD();
+
+            playerObj.position.set(0, 0, 25);
+            playerObj.rotation.y = Math.PI; // Mirar hacia adelante (norte)
+            
+            const diffConf = config[state.difficulty];
+            playerObj.userData.baseSpeed = diffConf.walkSpeed;
+
+            // Generar Basureros (Cilíndricos y Cajas)
+            const trashGeo1 = new THREE.CylinderGeometry(0.4, 0.35, 1.2, 12);
+            const trashGeo2 = new THREE.BoxGeometry(1.0, 1.0, 1.0);
+            
+            const numTrash = state.targetScore + 3;
+            for(let i=0; i<numTrash; i++) {
+                const isLeft = Math.random() > 0.5;
+                const xPos = isLeft ? -13 + Math.random()*3 : 13 - Math.random()*3;
+                const zPos = 20 - (i * (55/numTrash)) - (Math.random() * 4);
+                
+                const isBox = Math.random() > 0.6;
+                const trash = new THREE.Mesh(isBox ? trashGeo2 : trashGeo1, mats.trashFull);
+                trash.position.set(xPos, isBox ? 0.5 : 0.6, zPos);
+                if (isBox) trash.rotation.y = Math.random() * Math.PI;
+                
+                trash.castShadow = true;
+                trash.receiveShadow = true;
+                trash.userData = { looted: false, type: isBox ? 'box' : 'bin' };
+                scene.add(trash);
+                trashCans.push(trash);
+            }
+
+            // Generar Farolas
+            const poleGeo = new THREE.CylinderGeometry(0.1, 0.15, 7, 8);
+            const lampGeo = new THREE.BoxGeometry(1.2, 0.2, 0.5);
+            const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffeeaa });
+
+            const numLights = 3 + state.level;
+            for(let i=0; i<numLights; i++) {
+                const isLeft = i % 2 === 0;
+                const xPos = isLeft ? -10.5 : 10.5;
+                const zPos = 15 - (i * (50/numLights));
+
+                const poleGroup = new THREE.Group();
+                const pole = new THREE.Mesh(poleGeo, mats.building);
+                pole.position.y = 3.5;
+                poleGroup.add(pole);
+
+                const lamp = new THREE.Mesh(lampGeo, mats.building);
+                lamp.position.set(isLeft ? 0.6 : -0.6, 7, 0);
+                poleGroup.add(lamp);
+                
+                const bulb = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.3), bulbMat);
+                bulb.rotation.x = Math.PI / 2;
+                bulb.position.set(isLeft ? 0.6 : -0.6, 6.89, 0);
+                poleGroup.add(bulb);
+
+                poleGroup.position.set(xPos, 0, zPos);
+                scene.add(poleGroup);
+
+                // Spotlight dinámico
+                const spotLight = new THREE.SpotLight(0xffeeaa, 3);
+                spotLight.position.set(xPos + (isLeft?0.6:-0.6), 7, zPos);
+                spotLight.angle = Math.PI / 6; // Apertura
+                spotLight.penumbra = 0.4;
+                spotLight.decay = 1.5;
+                spotLight.distance = 18;
+                spotLight.castShadow = true;
+                spotLight.shadow.mapSize.width = 512;
+                spotLight.shadow.mapSize.height = 512;
+                
+                const targetObject = new THREE.Object3D();
+                targetObject.position.set(xPos + (isLeft?2.5:-2.5), 0, zPos);
+                scene.add(targetObject);
+                spotLight.target = targetObject;
+                scene.add(spotLight);
+
+                // Disco visual en el suelo (Área de Peligro)
+                const areaGeo = new THREE.CircleGeometry(diffConf.lightRadius, 32);
+                const areaMat = new THREE.MeshBasicMaterial({ color: 0xffddaa, transparent: true, opacity: 0.08, depthWrite: false });
+                const areaMesh = new THREE.Mesh(areaGeo, areaMat);
+                areaMesh.rotation.x = -Math.PI / 2;
+                areaMesh.position.set(targetObject.position.x, 0.05, targetObject.position.z);
+                scene.add(areaMesh);
+
+                streetLights.push({ mesh: poleGroup, light: spotLight, target: targetObject, area: areaMesh, x: targetObject.position.x, z: targetObject.position.z, radius: diffConf.lightRadius });
+            }
+        }
+
+        function spawnCar() {
+            const isGoingUp = Math.random() > 0.5; // Up = hacia z positivo (sur)
+            const xPos = isGoingUp ? 4 : -4; // Carriles
+            const startZ = isGoingUp ? -40 : 40;
+            const speed = 12 + Math.random() * 6;
+
+            const carGroup = new THREE.Group();
+            
+            // Chasis
+            const carGeo = new THREE.BoxGeometry(2.4, 1.2, 5);
+            const carMesh = new THREE.Mesh(carGeo, mats.carBody);
+            carMesh.position.y = 0.8;
+            carMesh.castShadow = true;
+            carGroup.add(carMesh);
+
+            // Techo/Ventanas (Caja más pequeña arriba)
+            const topGeo = new THREE.BoxGeometry(2.0, 0.8, 2.5);
+            const topMesh = new THREE.Mesh(topGeo, mats.building); // Oscuro para ventanas
+            topMesh.position.set(0, 1.8, -0.5);
+            carGroup.add(topMesh);
+
+            carGroup.position.set(xPos, 0, startZ);
+
+            // Faros dobles
+            const lightColor = 0xffffff;
+            const createHeadlight = (xOffset) => {
+                const hl = new THREE.SpotLight(lightColor, 4);
+                hl.position.set(xOffset, 1.0, isGoingUp ? 2.5 : -2.5);
+                hl.angle = Math.PI / 4.5;
+                hl.penumbra = 0.6;
+                hl.distance = 25;
+                hl.castShadow = true;
+                
+                const target = new THREE.Object3D();
+                target.position.set(xOffset, 0, isGoingUp ? 15 : -15);
+                carGroup.add(target);
+                hl.target = target;
+                carGroup.add(hl);
+                return { light: hl, target: target };
+            };
+
+            const l1 = createHeadlight(0.8);
+            const l2 = createHeadlight(-0.8);
+
+            scene.add(carGroup);
+
+            cars.push({
+                mesh: carGroup,
+                lights: [l1.light, l2.light],
+                speed: isGoingUp ? speed : -speed,
+                active: true,
+                dirZ: isGoingUp ? 1 : -1
+            });
+        }
+
+        function spawnParticles(originPos) {
+            const colors = [0x555555, 0x883333, 0x335522, 0xffccaa, 0x2222aa];
+            const pGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+            
+            for(let i=0; i<4; i++) {
+                const pMat = new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random()*colors.length)] });
+                const mesh = new THREE.Mesh(pGeo, pMat);
+                
+                mesh.position.copy(originPos);
+                mesh.position.y += 0.5;
+                
+                // Velocidad aleatoria (arco hacia arriba y los lados)
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 4,
+                    3 + Math.random() * 3,
+                    (Math.random() - 0.5) * 4
+                );
+                
+                scene.add(mesh);
+                particles.push({ mesh: mesh, vel: vel, life: 1.0 });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= dt;
+                
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    if(p.mesh.material) p.mesh.material.dispose();
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                // Gravedad y Movimiento
+                p.vel.y -= 9.8 * dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                p.mesh.rotation.x += p.vel.z * dt;
+                p.mesh.rotation.y += p.vel.x * dt;
+
+                // Suelo
+                if (p.mesh.position.y < 0.1) {
+                    p.mesh.position.y = 0.1;
+                    p.vel.y *= -0.3; // Rebote
+                    p.vel.x *= 0.5; // Fricción
+                    p.vel.z *= 0.5;
+                }
+            }
+        }
+
+        function update(dt) {
+            if (state.current !== GAME_STATE.PLAYING) return;
+
+            handleInput(dt);
+            updateAnimations(dt);
+            updateCamera(dt);
+            checkInteractions(dt);
+            updateCars(dt);
+            updateParticles(dt);
+            checkStealth(dt);
+        }
+
+        function handleInput(dt) {
+            if (state.isRummaging) {
+                playerObj.userData.velocity.set(0,0,0);
+                return;
+            }
+
+            const move = new THREE.Vector3(0, 0, 0);
+            let inputMagnitude = 0; // Para control analógico de velocidad
+
+            // 1. Priorizar Joystick (si está activo)
+            if (joystick.active && joystick.length > 0) {
+                move.x = joystick.x;
+                move.z = joystick.y;
+                inputMagnitude = joystick.length; // Entre 0.0 y 1.0
+            } 
+            // 2. Fallback a Teclado
+            else {
+                if (keys.w) move.z -= 1;
+                if (keys.s) move.z += 1;
+                if (keys.a) move.x -= 1;
+                if (keys.d) move.x += 1;
+                
+                if (move.lengthSq() > 0) {
+                    move.normalize();
+                    inputMagnitude = 1.0; // Teclado siempre es velocidad máxima
+                }
+            }
+
+            // Aplicar Movimiento
+            if (inputMagnitude > 0.05) { // Deadzone pequeño
+                // Rotación suave del modelo
+                const targetAngle = Math.atan2(move.x, move.z);
+                let currentAngle = playerObj.rotation.y;
+                
+                // Camino más corto para rotar
+                let diff = targetAngle - currentAngle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                
+                playerObj.rotation.y += diff * 12 * dt;
+
+                // Calcular velocidad final (Velocidad Base * Intensidad Analógica)
+                const currentSpeed = playerObj.userData.baseSpeed * inputMagnitude;
+                playerObj.userData.velocity.copy(move).multiplyScalar(currentSpeed);
+            } else {
+                // Fricción
+                playerObj.userData.velocity.lerp(new THREE.Vector3(0,0,0), 10 * dt);
+                if(playerObj.userData.velocity.lengthSq() < 0.01) playerObj.userData.velocity.set(0,0,0);
+            }
+
+            // Integración de Posición y Colisiones de Límites
+            const nextPos = playerObj.position.clone().addScaledVector(playerObj.userData.velocity, dt);
+            
+            // Restricción de Aceras/Edificios (x: -16 a 16) y Límites Z
+            nextPos.x = THREE.MathUtils.clamp(nextPos.x, -14.5, 14.5);
+            nextPos.z = THREE.MathUtils.clamp(nextPos.z, -30, 30);
+
+            // Colisión con Basureros (Cilindro simple)
+            let canMove = true;
+            for(let t of trashCans) {
+                const distSq = nextPos.distanceToSquared(t.position);
+                // Si es caja o cilindro, aproximación circular de radio 0.7
+                if (distSq < 0.6) { canMove = false; break; }
+            }
+
+            if (canMove) playerObj.position.copy(nextPos);
+        }
+
+        function updateAnimations(dt) {
+            const speed = playerObj.userData.velocity.length();
+            
+            if (speed > 0.1) {
+                // Caminando
+                playerRig.walkCycle += speed * dt * 2.5;
+                const wc = playerRig.walkCycle;
+                
+                // Rotación de patas (opuestas)
+                const legSwing = Math.sin(wc) * 0.6;
+                playerRig.legL.rotation.x = legSwing;
+                playerRig.legR.rotation.x = -legSwing;
+                playerRig.armL.rotation.x = -legSwing; // Brazos opuestos a patas
+                playerRig.armR.rotation.x = legSwing;
+
+                // Balanceo del cuerpo
+                playerRig.body.rotation.z = Math.sin(wc * 0.5) * 0.08;
+                playerRig.body.position.y = 0.5 + Math.abs(Math.cos(wc)) * 0.05;
+
+                // Cola moviéndose
+                playerRig.tail.rotation.z = Math.sin(wc * 0.5) * 0.2;
+
+                // Sonido de pasos rítmico basado en el ciclo
+                if (Math.cos(wc) < -0.9 && !playerRig.stepPlayed) {
+                    audio.sfxStep();
+                    playerRig.stepPlayed = true;
+                } else if (Math.cos(wc) > 0) {
+                    playerRig.stepPlayed = false;
+                }
+
+            } else {
+                // Quieto (Idle)
+                playerRig.walkCycle = 0;
+                playerRig.legL.rotation.x = THREE.MathUtils.lerp(playerRig.legL.rotation.x, 0, 10*dt);
+                playerRig.legR.rotation.x = THREE.MathUtils.lerp(playerRig.legR.rotation.x, 0, 10*dt);
+                playerRig.armL.rotation.x = THREE.MathUtils.lerp(playerRig.armL.rotation.x, 0, 10*dt);
+                playerRig.armR.rotation.x = THREE.MathUtils.lerp(playerRig.armR.rotation.x, 0, 10*dt);
+                playerRig.body.rotation.z = THREE.MathUtils.lerp(playerRig.body.rotation.z, 0, 10*dt);
+                playerRig.body.position.y = THREE.MathUtils.lerp(playerRig.body.position.y, 0.5, 10*dt);
+                
+                // Ligera respiración
+                playerRig.body.scale.setScalar(1.0 + Math.sin(clock.elapsedTime * 2) * 0.02);
+            }
+        }
+
+        function updateCamera(dt) {
+            // Lerp suave de la cámara siguiendo al jugador
+            const targetPos = playerObj.position.clone();
+            targetPos.y += 14;  // Altura (Ajustada para mejor visibilidad móvil)
+            targetPos.z += 12;  // Retraso en Z (Ángulo isométrico/Top-down)
+            
+            camera.position.lerp(targetPos, 5 * dt);
+            camera.lookAt(playerObj.position);
+        }
+
+        function updateCars(dt) {
+            const diffConf = config[state.difficulty];
+            if (Math.random() < diffConf.carFreq * (dt * 60)) { // Normalizar por frame
+                spawnCar();
+            }
+
+            for (let i = cars.length - 1; i >= 0; i--) {
+                const c = cars[i];
+                if (!c.active) continue;
+
+                c.mesh.position.z += c.speed * dt;
+                
+                // Actualizar targets de luces
+                c.lights.forEach(l => l.target.position.z = c.mesh.position.z + (c.dirZ * 15));
+
+                if (Math.abs(c.mesh.position.z) > 45) {
+                    scene.remove(c.mesh);
+                    cars.splice(i, 1);
+                }
+            }
+        }
+
+        function checkStealth(dt) {
+            let inLight = false;
+            const diffConf = config[state.difficulty];
+            const pPos = playerObj.position;
+
+            // 1. Revisar Farolas estáticas (Cilindros de luz)
+            for (let light of streetLights) {
+                const distSq = (pPos.x - light.x)**2 + (pPos.z - light.z)**2;
+                if (distSq < light.radius * light.radius) {
+                    inLight = true; break;
+                }
+            }
+
+            // 2. Revisar luces de Coches (Cono aproximado)
+            if (!inLight) {
+                for (let c of cars) {
+                    const dx = pPos.x - c.mesh.position.x;
+                    const dz = pPos.z - c.mesh.position.z;
+                    const distSq = dx*dx + dz*dz;
+                    
+                    if (distSq < 400) { // Radio max 20
+                        // Si está frente al coche según su dirección
+                        if ((c.dirZ > 0 && dz > 0) || (c.dirZ < 0 && dz < 0)) {
+                            // Aproximación de cono: X no debe ser muy amplio respecto a Z
+                            if (Math.abs(dx) < Math.abs(dz) * 0.6) {
+                                inLight = true; break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Sistema de Alerta Visual y Game Over
+            const indicator = document.getElementById('status-dot');
+            const hudText = document.querySelector('#score-display').parentElement;
+
+            if (inLight) {
+                if (state.exposureLevel === 0) audio.sfxAlert(); // Sonido inicial de alerta
+                
+                state.exposureLevel += diffConf.detectSpeed * dt;
+                indicator.className = 'status-danger';
+                hudText.classList.add('alert-anim');
+                
+                if (state.exposureLevel >= 1.0) {
+                    gameOver();
+                }
+            } else {
+                state.exposureLevel -= dt * 1.5; // Recuperación
+                if (state.exposureLevel < 0) state.exposureLevel = 0;
+                
+                hudText.classList.remove('alert-anim');
+                if (state.exposureLevel > 0) {
+                    indicator.className = 'status-warning';
+                } else {
+                    indicator.className = '';
+                }
+            }
+        }
+
+        function checkInteractions(dt) {
+            let nearTrash = null;
+            const interactionDistSq = 2.5; // Distancia al cuadrado (aprox 1.5m)
+
+            for (let t of trashCans) {
+                if (t.userData.looted) continue;
+                const distSq = playerObj.position.distanceToSquared(t.position);
+                if (distSq < interactionDistSq) {
+                    nearTrash = t;
+                    break;
+                }
+            }
+
+            const actionBtn = document.getElementById('btn-action-touch');
+            const actionContainer = document.getElementById('action-container');
+            const isActionPressed = keys.space || actionBtn.classList.contains('active-touch');
+
+            if (nearTrash) {
+                if (state.isMobile) actionBtn.classList.add('highlight');
+                
+                // Convertir posición 3D a 2D para colocar la barra arriba del jugador
+                actionContainer.style.display = 'block';
+                actionContainer.style.opacity = '1';
+
+                if (isActionPressed) {
+                    if (!state.isRummaging) {
+                        state.isRummaging = true;
+                        // Girar hacia la basura
+                        playerObj.lookAt(nearTrash.position.x, playerObj.position.y, nearTrash.position.z);
+                    }
+                    
+                    state.rummageProgress += dt;
+                    
+                    // Efectos al urgar
+                    if (Math.random() > 0.8) {
+                        audio.sfxRummage();
+                        spawnParticles(nearTrash.position);
+                        // Pequeño movimiento del mapache
+                        playerRig.body.rotation.z = (Math.random() - 0.5) * 0.2;
+                    }
+
+                    document.getElementById('action-bar-fill').style.width = Math.min((state.rummageProgress / 2) * 100, 100) + '%';
+
+                    if (state.rummageProgress >= 2.0) { 
+                        completeRummage(nearTrash);
+                    }
+                } else {
+                    cancelRummage();
+                }
+            } else {
+                if (state.isMobile) actionBtn.classList.remove('highlight');
+                actionContainer.style.opacity = '0';
+                setTimeout(() => { if(!state.isRummaging) actionContainer.style.display = 'none'; }, 200);
+                cancelRummage();
+            }
+        }
+
+        function cancelRummage() {
+            state.isRummaging = false;
+            state.rummageProgress = 0;
+            document.getElementById('action-bar-fill').style.width = '0%';
+        }
+
+        function completeRummage(trashObj) {
+            trashObj.userData.looted = true;
+            trashObj.material = mats.trashEmpty; // Se vuelve gris oscuro
+            
+            // Explosión de basura exitosa
+            for(let i=0; i<3; i++) spawnParticles(trashObj.position);
+            
+            state.score++;
+            updateHUD();
+            audio.sfxSuccess();
+            cancelRummage();
+
+            if (state.score >= state.targetScore) {
+                setTimeout(levelComplete, 500); // Pequeño delay
+            }
+        }
+
+        function updateHUD() {
+            document.getElementById('score-display').innerText = `${state.score} / ${state.targetScore}`;
+            document.getElementById('level-display').innerText = state.level;
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            if (id) {
+                const el = document.getElementById(id);
+                el.classList.remove('hidden');
+                // Timeout necesario para que la transición CSS funcione quitando el hidden primero
+                setTimeout(() => el.style.opacity = '1', 10);
+            }
+        }
+
+        function startGame() {
+            audio.init();
+            audio.startBGM();
+            state.level = 1;
+            state.score = 0;
+            state.exposureLevel = 0;
+            state.current = GAME_STATE.PLAYING;
+            
+            generateLevel();
+            showScreen(null);
+            
+            document.getElementById('hud').classList.remove('hidden');
+            if (state.isMobile) {
+                document.getElementById('touch-controls').style.display = 'block';
+                document.getElementById('touch-controls').style.pointerEvents = 'auto'; // Permitir clicks a hijos
+            } else {
+                const pcInst = document.getElementById('pc-instructions');
+                pcInst.classList.remove('hidden');
+                setTimeout(() => pcInst.classList.add('hidden'), 6000);
+            }
+        }
+
+        function levelComplete() {
+            state.current = GAME_STATE.WIN;
+            showScreen('screen-win');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('touch-controls').style.display = 'none';
+        }
+
+        function nextLevel() {
+            state.level++;
+            state.exposureLevel = 0;
+            state.current = GAME_STATE.PLAYING;
+            generateLevel();
+            showScreen(null);
+            document.getElementById('hud').classList.remove('hidden');
+            if (state.isMobile) document.getElementById('touch-controls').style.display = 'block';
+        }
+
+        function gameOver() {
+            state.current = GAME_STATE.GAMEOVER;
+            audio.sfxCaught();
+            audio.stopBGM();
+            document.getElementById('final-level').innerText = state.level;
+            showScreen('screen-gameover');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('touch-controls').style.display = 'none';
+        }
+
+        // Bucle Principal (Loop)
+        function animate(time) {
+            requestAnimationFrame(animate);
+            
+            // Delta time capping (Max 0.1s) para evitar bugs de física en lag
+            let dt = (time - state.lastTime) / 1000;
+            state.lastTime = time;
+            if (dt > 0.1) dt = 0.1; 
+
+            if (state.current === GAME_STATE.PLAYING) {
+                update(dt);
+            }
+            renderer.render(scene, camera);
+        }
+
+        // Eventos de Teclado
+        const setKey = (e, isDown) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') keys.w = isDown;
+            if (k === 'a' || k === 'arrowleft') keys.a = isDown;
+            if (k === 's' || k === 'arrowdown') keys.s = isDown;
+            if (k === 'd' || k === 'arrowright') keys.d = isDown;
+            if (k === ' ') keys.space = isDown;
+        };
+        window.addEventListener('keydown', e => setKey(e, true));
+        window.addEventListener('keyup', e => setKey(e, false));
+
+        // Eventos Táctiles (Joystick Analógico Mejorado)
+        const joyZone = document.getElementById('joystick-zone');
+        const joyKnob = document.getElementById('joystick-knob');
+        let joyCenter = { x: 0, y: 0 };
+        let maxJoyDist = 50;
+
+        joyZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            joystick.active = true;
+            const rect = joyZone.getBoundingClientRect();
+            maxJoyDist = rect.width / 2.5; // Dinámico según pantalla
+            joyCenter.x = rect.left + rect.width / 2;
+            joyCenter.y = rect.top + rect.height / 2;
+            updateJoystick(e.touches[0]);
+        }, {passive: false});
+
+        joyZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (joystick.active) updateJoystick(e.touches[0]);
+        }, {passive: false});
+
+        const resetJoystick = () => {
+            joystick.active = false; joystick.x = 0; joystick.y = 0; joystick.length = 0;
+            joyKnob.style.transform = `translate(0px, 0px)`;
+        };
+        joyZone.addEventListener('touchend', resetJoystick);
+        joyZone.addEventListener('touchcancel', resetJoystick);
+
+        function updateJoystick(touch) {
+            let dx = touch.clientX - joyCenter.x;
+            let dy = touch.clientY - joyCenter.y;
+            const dist = Math.hypot(dx, dy);
+            
+            let normalizedDist = dist / maxJoyDist;
+            if (normalizedDist > 1.0) normalizedDist = 1.0; // Clampear a 1
+
+            // Visual
+            const visX = (dx / dist || 0) * (normalizedDist * maxJoyDist);
+            const visY = (dy / dist || 0) * (normalizedDist * maxJoyDist);
+            joyKnob.style.transform = `translate(${visX}px, ${visY}px)`;
+            
+            // Lógico
+            joystick.length = normalizedDist;
+            joystick.x = (dx / dist) || 0;
+            joystick.y = (dy / dist) || 0;
+        }
+
+        // Botón Acción Táctil
+        const btnAction = document.getElementById('btn-action-touch');
+        const setTouchBtn = (on) => { if(on) btnAction.classList.add('active-touch'); else btnAction.classList.remove('active-touch'); };
+        btnAction.addEventListener('touchstart', (e) => { e.preventDefault(); setTouchBtn(true); });
+        btnAction.addEventListener('touchend', (e) => { e.preventDefault(); setTouchBtn(false); });
+        btnAction.addEventListener('touchcancel', (e) => { e.preventDefault(); setTouchBtn(false); });
+
+        // Eventos UI
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        document.getElementById('btn-play').addEventListener('click', startGame);
+        document.getElementById('btn-settings').addEventListener('click', () => showScreen('screen-settings'));
+        document.getElementById('btn-back').addEventListener('click', () => showScreen('screen-main'));
+        document.getElementById('btn-retry').addEventListener('click', startGame);
+        document.getElementById('btn-menu-from-lose').addEventListener('click', () => showScreen('screen-main'));
+        document.getElementById('btn-next-level').addEventListener('click', nextLevel);
+
+        document.querySelectorAll('.btn-diff').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.btn-diff').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                state.difficulty = e.target.dataset.diff;
+            });
+        });
+
+        document.getElementById('btn-toggle-sound').addEventListener('click', (e) => {
+            audio.enabled = !audio.enabled;
+            e.target.innerText = audio.enabled ? 'Sonido: ON' : 'Sonido: OFF';
+            if(!audio.enabled) audio.stopBGM();
+        });
+
+        // Prevenir scroll elástico y context menu en móviles
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('touchmove', e => { if(e.target.tagName !== 'BUTTON') e.preventDefault(); }, {passive: false});
+
+        // Arranque
+        initThreeJS();
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+  </html>
