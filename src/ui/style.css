@@ -1,1 +1,22 @@
+* {
+    box-sizing: border-box;
+}
 
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden; /* Evita el scroll en móviles */
+    background-color: #05060a; /* Azul marino/negro muy oscuro */
+    touch-action: none; /* Desactiva gestos nativos del navegador */
+}
+
+#game-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
