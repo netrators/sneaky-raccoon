@@ -3,6 +3,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { PropsManager } from '../entities/Props.js';
 import { InputManager } from '../systems/InputManager.js';
 import { Player } from '../entities/Player.js';
+import { PedestrianAI } from '../entities/PedestrianAI.js'; // NUEVO IMPORT
 
 export class GameEngine {
     constructor(containerId) {
@@ -17,6 +18,7 @@ export class GameEngine {
         this.propsManager = null;
         this.inputManager = null;
         this.player = null;
+        this.guards = []; // NUEVO: Arreglo de guardias
     }
 
     init() {
@@ -24,7 +26,6 @@ export class GameEngine {
         this.scene.fog = new THREE.FogExp2(0x05060a, 0.03);
 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-        // Iniciamos la cámara en el centro, luego seguirá al jugador dinámicamente
         this.camera.position.set(0, 15, 15);
         this.camera.lookAt(0, 0, 0);
 
@@ -42,12 +43,21 @@ export class GameEngine {
         this.propsManager = new PropsManager(this.scene);
         this.propsManager.buildAlley();
 
-        // --- NUEVO: Inicializar Sistemas y Jugador ---
         this.inputManager = new InputManager();
         this.player = new Player(this.scene);
 
+        // --- NUEVO: Crear un Guardia patrullando ---
+        // Definimos los puntos por los que va a caminar de un lado al otro
+        const waypoints = [
+            new THREE.Vector3(-10, 0, 8),
+            new THREE.Vector3(10, 0, 8)
+        ];
+        // Lo instanciamos y lo guardamos
+        const guard1 = new PedestrianAI(this.scene, this.player, waypoints[0], waypoints);
+        this.guards.push(guard1);
+
         this.animate();
-        console.log("🦝 Fase 3: Mapache y controles listos");
+        console.log("🦝 Fase 4: Inteligencia Artificial activa");
     }
 
     _setupNightLighting() {
@@ -57,7 +67,6 @@ export class GameEngine {
         const moonLight = new THREE.DirectionalLight(0x88aaff, 0.8);
         moonLight.position.set(-10, 20, -10);
         moonLight.castShadow = true;
-        
         moonLight.shadow.camera.left = -20;
         moonLight.shadow.camera.right = 20;
         moonLight.shadow.camera.top = 20;
@@ -77,22 +86,20 @@ export class GameEngine {
         
         const deltaTime = this.clock.getDelta();
         
-        // Actualizar la lógica del jugador pasándole los inputs del teclado
         if (this.player && this.inputManager) {
             this.player.update(deltaTime, this.inputManager.keys);
             
-            // --- CÁMARA CON SEGUIMIENTO SUAVE (LERP) ---
-            // Queremos que la cámara esté siempre arriba (y=15) y atrás (z=10) del mapache
             const idealCameraPos = new THREE.Vector3(
                 this.player.mesh.position.x,
                 15,
                 this.player.mesh.position.z + 10
             );
-            
-            // Interpolar la posición actual hacia la ideal (el '0.05' dicta qué tan elástica/suave es)
             this.camera.position.lerp(idealCameraPos, 5 * deltaTime);
             this.camera.lookAt(this.player.mesh.position);
         }
+
+        // --- NUEVO: Actualizar a todos los guardias ---
+        this.guards.forEach(guard => guard.update(deltaTime));
         
         this.renderer.render(this.scene, this.camera);
     }
