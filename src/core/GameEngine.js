@@ -76,7 +76,7 @@ export class GameEngine {
             this.guards.push(guard);
         }
 
-    _setupDayLighting() 
+    _setupDayLighting()
         // Luz ambiental blanca y potente (llena todo de luz)
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); 
         this.scene.add(ambientLight);
