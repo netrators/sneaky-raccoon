@@ -8,7 +8,8 @@ html, body {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background-color: #05060a;
+    /* CAMBIO: Color base que combina con el atardecer */
+    background-color: #8c5b3f; 
     touch-action: none;
     font-family: sans-serif;
 }
