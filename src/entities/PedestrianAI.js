@@ -5,14 +5,14 @@ export class PedestrianAI {
     constructor(scene, player, startPos, waypoints) {
         this.scene = scene;
         this.player = player;
-        this.waypoints = waypoints; // Array de posiciones Vector3 por donde patrullará
+        this.waypoints = waypoints;
         this.currentWaypoint = 0;
 
         this.speed = 2.0;
-        this.state = 'PATROL'; // Estados: PATROL, ALERT
-        this.visionRange = 10; // Qué tan lejos llega su luz
-        this.visionAngle = Math.PI / 5; // Ángulo del cono de visión (unos 36 grados)
-        this.hearingRange = 8; // Distancia a la que escucha tus pasos si corres
+        this.state = 'PATROL';
+        this.visionRange = 10;
+        this.visionAngle = Math.PI / 5;
+        this.hearingRange = 8;
 
         this._buildModel(startPos);
     }
@@ -21,7 +21,6 @@ export class PedestrianAI {
         this.mesh = new THREE.Group();
         this.mesh.position.copy(pos);
 
-        // Cuerpo del guardia (Cápsula roja para distinguirlo)
         const bodyGeo = new THREE.CapsuleGeometry(0.4, 1.2, 4, 8);
         const bodyMat = new THREE.MeshStandardMaterial({ color: 0x882222 }); 
         const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -29,22 +28,21 @@ export class PedestrianAI {
         body.castShadow = true;
         this.mesh.add(body);
 
-        // La Linterna (Un foco de luz pegado a su cuerpo)
         this.flashlight = new THREE.SpotLight(0xffffff, 3, this.visionRange, this.visionAngle, 0.5, 1);
-        this.flashlight.position.set(0, 1.2, 0); // Altura del pecho
-        this.flashlight.target.position.set(0, 0, 1); // Apuntando hacia adelante
+        this.flashlight.position.set(0, 1.2, 0);
+        this.flashlight.target.position.set(0, 0, 1);
         this.flashlight.castShadow = true;
         
         this.mesh.add(this.flashlight);
-        this.mesh.add(this.flashlight.target); // Vital para que la luz rote con el guardia
+        this.mesh.add(this.flashlight.target);
 
         this.scene.add(this.mesh);
     }
 
-   update(deltaTime) {
+    update(deltaTime) {
         if (!this.player) return;
 
-        // NUEVO: Si el jugador se escondió, pierde el interés
+        // Si el jugador se escondió, pierde el interés
         if (this.player.isHidden) {
             if (this.state === 'ALERT') {
                 this.state = 'PATROL';
@@ -70,6 +68,7 @@ export class PedestrianAI {
             }
         }
 
+        // Máquina de Estados
         if (this.state === 'PATROL') {
             this.patrol(deltaTime);
         } else if (this.state === 'ALERT') {
@@ -79,25 +78,12 @@ export class PedestrianAI {
         }
     }
 
-        // 3. Máquina de Estados (Actuar según lo detectado)
-        if (this.state === 'PATROL') {
-            this.flashlight.color.setHex(0xffffff); // Luz blanca normal
-            this.speed = 2.0;
-            this.patrol(deltaTime);
-        } else if (this.state === 'ALERT') {
-            this.flashlight.color.setHex(0xff0000); // ¡Luz roja de alarma!
-            this.speed = 3.5; // Corre más rápido para atraparte
-            this.moveTo(this.player.mesh.position, deltaTime); // Persigue al jugador
-        }
-    }
-
     patrol(deltaTime) {
         if (this.waypoints.length === 0) return;
         const target = this.waypoints[this.currentWaypoint];
         
         this.moveTo(target, deltaTime);
 
-        // Si llegamos al punto actual, cambiamos al siguiente
         if (this.mesh.position.distanceTo(target) < 0.5) {
             this.currentWaypoint = (this.currentWaypoint + 1) % this.waypoints.length;
         }
@@ -105,14 +91,12 @@ export class PedestrianAI {
 
     moveTo(target, deltaTime) {
         const direction = new THREE.Vector3().subVectors(target, this.mesh.position);
-        direction.y = 0; // Evita que mire al cielo o al piso
+        direction.y = 0; 
         
         if (direction.lengthSq() > 0.01) {
             direction.normalize();
-            // Moverse
             this.mesh.position.addScaledVector(direction, this.speed * deltaTime);
 
-            // Rotar fluidamente hacia la dirección
             const targetAngle = Math.atan2(direction.x, direction.z);
             const targetRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), targetAngle);
             this.mesh.quaternion.slerp(targetRotation, 5 * deltaTime);
