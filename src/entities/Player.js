@@ -40,7 +40,7 @@ export class Player {
         const loader = new GLTFLoader();
         loader.load(
             './public/media/models/raccoon.glb', // <--- ¡AÑADIMOS /public/ AQUÍ!
-            (gltf) => {
+            (gltf) =>
                 const realModel = gltf.scene;
                 // Escalar el modelo (ajusta este valor según el modelo que descargues)
                 realModel.scale.set(0.5, 0.5, 0.5); 
