@@ -1,48 +1,70 @@
 // src/entities/Player.js
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+// IMPORTANTE: Importamos el cargador oficial de modelos GLTF
+import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
 export class Player {
     constructor(scene) {
         this.scene = scene;
-        
         this.speed = 4.0;
         this.sprintMultiplier = 2.0;
         this.stamina = 100;
-        this.isSprinting = false; // NUEVO: Para que la IA sepa si hacemos ruido
-        
+        this.isSprinting = false;
+        this.isHidden = false;
         this.velocity = new THREE.Vector3();
         
-        this._buildModel();
+        // Creamos la figura procedural como "Plan B"
+        this._buildProceduralModel();
+        // Intentamos cargar el modelo real (Plan A)
+        this._loadRealModel();
     }
 
-    _buildModel() {
+    _buildProceduralModel() {
         this.mesh = new THREE.Group();
         this.mesh.position.set(0, 0.5, 0);
 
+        this.fallbackBody = new THREE.Group(); // Agrupamos la geometría para ocultarla fácil luego
         const bodyMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-        const detailMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.5, 4, 8), bodyMat);
+        body.rotation.x = Math.PI / 2; body.position.y = 0.2; body.castShadow = true;
+        this.fallbackBody.add(body);
 
-        const bodyGeo = new THREE.CapsuleGeometry(0.4, 0.5, 4, 8);
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.rotation.x = Math.PI / 2;
-        body.position.y = 0.2;
-        body.castShadow = true;
-        this.mesh.add(body);
+        const snout = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.4), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        snout.position.set(0, 0.3, 0.6); snout.castShadow = true;
+        this.fallbackBody.add(snout);
 
-        const snoutGeo = new THREE.BoxGeometry(0.3, 0.2, 0.4);
-        const snout = new THREE.Mesh(snoutGeo, detailMat);
-        snout.position.set(0, 0.3, 0.6);
-        snout.castShadow = true;
-        this.mesh.add(snout);
-
-        const tailGeo = new THREE.CylinderGeometry(0.1, 0.2, 0.8);
-        const tail = new THREE.Mesh(tailGeo, bodyMat);
-        tail.rotation.x = -Math.PI / 4;
-        tail.position.set(0, 0.2, -0.6);
-        tail.castShadow = true;
-        this.mesh.add(tail);
-
+        this.mesh.add(this.fallbackBody);
         this.scene.add(this.mesh);
+    }
+
+    _loadRealModel() {
+        const loader = new GLTFLoader();
+        // Intentará buscar este archivo. ¡Si no lo tienes, fallará silenciosamente y seguirá usando los cubos!
+        loader.load(
+            './models/raccoon.glb', 
+            (gltf) => {
+                const realModel = gltf.scene;
+                // Escalar el modelo (ajusta este valor según el modelo que descargues)
+                realModel.scale.set(0.5, 0.5, 0.5); 
+                
+                // Activar sombras en el modelo nuevo
+                realModel.traverse((child) => {
+                    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+                });
+
+                // Ocultar nuestro modelo procedural de cubos
+                this.fallbackBody.visible = false;
+                
+                // Añadir el modelo 3D real
+                this.mesh.add(realModel);
+                console.log("¡Modelo de mapache 3D cargado con éxito!");
+            },
+            undefined, // Progreso de carga
+            (error) => {
+                // Si falla (porque no has creado la carpeta o descargado el modelo aún)
+                console.log("No se encontró el modelo 3D del mapache. Usando geometría procedural por ahora.");
+            }
+        );
     }
 
     update(deltaTime, inputKeys) {
@@ -56,12 +78,12 @@ export class Player {
         if (moveDir.length() > 0) moveDir.normalize();
 
         let currentSpeed = this.speed;
-        this.isSprinting = false; // Reseteamos el estado cada frame
+        this.isSprinting = false; 
 
         if (inputKeys.sprint && this.stamina > 0 && moveDir.length() > 0) {
             currentSpeed *= this.sprintMultiplier;
             this.stamina -= 20 * deltaTime;
-            this.isSprinting = true; // Hacemos ruido
+            this.isSprinting = true;
         } else if (this.stamina < 100) {
             this.stamina += 10 * deltaTime;
         }
