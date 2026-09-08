@@ -17,19 +17,17 @@ export class AudioEngine {
     }
 
     startAmbientMusic() {
-        // Sintetizador 1: Un tono bajo continuo (Drone)
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.value = 55; // Frecuencia muy baja, estilo película de terror
+        osc.frequency.value = 55;
         
-        // Sintetizador 2: LFO (Low Frequency Oscillator) para dar sensación de pulsación/respiración
         const lfo = this.ctx.createOscillator();
         lfo.type = 'sine';
-        lfo.frequency.value = 0.15; // Pulsa muy lento
+        lfo.frequency.value = 0.15; 
         
         const lfoGain = this.ctx.createGain();
-        lfoGain.gain.value = 0.4;
+        lfoGain.gain.value = 0.2; // Reducimos la intensidad del pulso también
         
         lfo.connect(lfoGain);
         lfoGain.connect(gain.gain);
@@ -40,8 +38,8 @@ export class AudioEngine {
         osc.start();
         lfo.start();
         
-        // Volumen base
-        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        // ¡AQUÍ ESTÁ EL CAMBIO! Bajamos el volumen base de 0.3 a 0.05
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
     }
 
     playAlertSound() {
