@@ -56,30 +56,25 @@ export class GameEngine {
         this._setupDayLighting();
         
         this.propsManager = new PropsManager(this.scene);
-        this.propsManager.buildAlley();
+        this.propsManager.buildWorld(); // <--- ACTUALIZADO A MUNDO ABIERTO
 
         this.inputManager = new InputManager();
         this.uiManager = new UIManager();
         this.audioEngine = new AudioEngine(); 
         this.player = new Player(this.scene);
+        
+        this.maxScore = 15; // Ahora hay 15 basuras en el mapa
 
-        const waypoints = [
-            new THREE.Vector3(-10, 0, 8),
-            new THREE.Vector3(10, 0, 8)
-        ];
-        const guard1 = new PedestrianAI(this.scene, this.player, waypoints[0], waypoints);
-        this.guards.push(guard1);
-
-        const startScreen = document.getElementById('start-screen');
-        startScreen.addEventListener('click', async () => {
-            await this.audioEngine.init();
-            startScreen.style.opacity = '0';
-            setTimeout(() => {
-                startScreen.style.display = 'none';
-                this.animate();
-            }, 500);
-        });
-    }
+        // Generar 5 Cazadores (Guardias) aleatorios
+        for (let i = 0; i < 5; i++) {
+            const rx = (Math.random() - 0.5) * 80;
+            const rz = (Math.random() - 0.5) * 80;
+            const wp1 = new THREE.Vector3(rx - 15, 0, rz);
+            const wp2 = new THREE.Vector3(rx + 15, 0, rz);
+            // Cada guardia patrullará entre dos puntos aleatorios
+            const guard = new PedestrianAI(this.scene, this.player, wp1, [wp1, wp2]);
+            this.guards.push(guard);
+        }
 
     _setupDayLighting() {
         // Luz ambiental blanca y potente (llena todo de luz)
