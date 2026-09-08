@@ -34,7 +34,7 @@ export class GameEngine {
 
     init() {
         this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.FogExp2(0x05060a, 0.03);
+        this.scene.fog = new THREE.FogExp2(0x8c5b3f, 0.025);
 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
         this.camera.position.set(0, 15, 15);
