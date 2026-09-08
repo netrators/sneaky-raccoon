@@ -7,9 +7,10 @@ html, body {
     padding: 0;
     width: 100vw;
     height: 100vh;
-    overflow: hidden; /* Evita el scroll en móviles */
-    background-color: #05060a; /* Azul marino/negro muy oscuro */
-    touch-action: none; /* Desactiva gestos nativos del navegador */
+    overflow: hidden;
+    background-color: #05060a;
+    touch-action: none;
+    font-family: sans-serif;
 }
 
 #game-container {
@@ -20,15 +21,19 @@ html, body {
     left: 0;
     z-index: 1;
 }
+
 #ui-layer {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none; /* Deja que los clics pasen al juego 3D */
+    top: 0; 
+    left: 0;
+    width: 100%; 
+    height: 100%;
+    pointer-events: none; /* Vital para que el ratón no choque con la UI */
     z-index: 10;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    align-items: center;
     padding: 30px;
 }
 
@@ -39,7 +44,26 @@ html, body {
     font-weight: bold;
     text-align: center;
     text-shadow: 0 0 10px #ff0000;
-    opacity: 0; /* Oculto por defecto */
+    opacity: 0; 
+    transition: opacity 0.2s;
+    margin-top: 20px;
+}
+
+#hud-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+#interact-prompt {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    opacity: 0; 
     transition: opacity 0.2s;
 }
 
@@ -50,7 +74,6 @@ html, body {
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 10px;
     overflow: hidden;
-    margin-bottom: 20px;
 }
 
 #stamina-bar {
@@ -59,17 +82,4 @@ html, body {
     background: #00ff88;
     box-shadow: 0 0 10px #00ff88;
     transition: width 0.1s linear, background-color 0.3s;
-}
-
-#interact-prompt {
-    align-self: center;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    font-family: sans-serif;
-    font-weight: bold;
-    opacity: 0; /* Oculto por defecto */
-    transition: opacity 0.2s;
-    margin-bottom: 50px;
 }
