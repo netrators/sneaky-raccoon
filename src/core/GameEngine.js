@@ -1,87 +1,191 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+import { PropsManager } from '../entities/Props.js';
+import { InputManager } from '../systems/InputManager.js';
+import { Player } from '../entities/Player.js';
+import { PedestrianAI } from '../entities/PedestrianAI.js';
+import { UIManager } from '../ui/UIManager.js';
+import { AudioEngine } from '../systems/AudioEngine.js'; 
 
-export class Player {
-    constructor(scene) {
-        this.scene = scene;
-        this.speed = 4.0;
-        this.sprintMultiplier = 2.0;
-        this.stamina = 100;
-        this.isSprinting = false;
-        this.isHidden = false;
-        this.velocity = new THREE.Vector3();
+export class GameEngine {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        if (!this.container) throw new Error(`No se encontró el contenedor: ${containerId}`);
 
-        this._buildProceduralModel();
-        this._loadRealModel();
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.clock = new THREE.Clock();
+        
+        this.propsManager = null;
+        this.inputManager = null;
+        this.player = null;
+        this.guards = [];
+        this.uiManager = null;
+        this.audioEngine = null; 
+        
+        this.interactionCooldown = false;
+        this.wasAlertedLastFrame = false;
+        
+        this.score = 0;
+        this.maxScore = 15; 
     }
 
-    _buildProceduralModel() {
-        this.mesh = new THREE.Group();
-        this.mesh.position.set(0, 0.5, 0);
+    init() {
+        this.scene = new THREE.Scene();
+        this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
 
-        this.fallbackBody = new THREE.Group();
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-        const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.5, 4, 8), bodyMat);
-        body.rotation.x = Math.PI / 2; body.position.y = 0.2; body.castShadow = true;
-        this.fallbackBody.add(body);
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+        this.camera.position.set(0, 15, 15);
+        this.camera.lookAt(0, 0, 0);
 
-        const snout = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.4), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-        snout.position.set(0, 0.3, 0.6); snout.castShadow = true;
-        this.fallbackBody.add(snout);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        this.container.appendChild(this.renderer.domElement);
+        window.addEventListener('resize', this.onWindowResize.bind(this));
 
-        this.mesh.add(this.fallbackBody);
-        this.scene.add(this.mesh);
+        this._setupDayLighting();
+        
+        this.propsManager = new PropsManager(this.scene);
+        this.propsManager.buildWorld();
+
+        this.inputManager = new InputManager();
+        this.uiManager = new UIManager();
+        this.audioEngine = new AudioEngine(); 
+        this.player = new Player(this.scene);
+
+        for (let i = 0; i < 5; i++) {
+            const rx = (Math.random() - 0.5) * 80;
+            const rz = (Math.random() - 0.5) * 80;
+            const wp1 = new THREE.Vector3(rx - 15, 0, rz);
+            const wp2 = new THREE.Vector3(rx + 15, 0, rz);
+            const guard = new PedestrianAI(this.scene, this.player, wp1, [wp1, wp2]);
+            this.guards.push(guard);
+        }
+
+        const startScreen = document.getElementById('start-screen');
+        startScreen.addEventListener('click', async () => {
+            await this.audioEngine.init();
+            startScreen.style.opacity = '0';
+            setTimeout(() => {
+                startScreen.style.display = 'none';
+                this.animate();
+            }, 500);
+        });
     }
 
-    _loadRealModel() {
-        const loader = new GLTFLoader();
-        loader.load(
-            './public/media/models/raccoon.glb',
-            (gltf) => {
-                const realModel = gltf.scene;
-                realModel.scale.set(0.5, 0.5, 0.5); 
-                realModel.traverse((child) => {
-                    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
-                });
-                this.fallbackBody.visible = false;
-                this.mesh.add(realModel);
-                console.log("¡Modelo de mapache 3D cargado con éxito!");
-            },
-            undefined,
-            (error) => {
-                console.log("No se encontró el modelo 3D del mapache. Usando geometría procedural por ahora.");
+    _setupDayLighting() {
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); 
+        this.scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaee, 1.5); 
+        sunLight.position.set(20, 30, 10); 
+        sunLight.castShadow = true;
+        
+        sunLight.shadow.mapSize.width = 2048; 
+        sunLight.shadow.mapSize.height = 2048;
+        
+        sunLight.shadow.camera.left = -30;
+        sunLight.shadow.camera.right = 30;
+        sunLight.shadow.camera.top = 30;
+        sunLight.shadow.camera.bottom = -30;
+        
+        this.scene.add(sunLight);
+    }
+
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    animate() {
+        requestAnimationFrame(this.animate.bind(this));
+        
+        const deltaTime = this.clock.getDelta();
+        
+        if (this.player && this.inputManager) {
+            if (!this.player.isHidden) {
+                this.player.update(deltaTime, this.inputManager.keys);
             }
-        );
-    }
+            
+            const idealCameraPos = new THREE.Vector3(
+                this.player.mesh.position.x,
+                4, 
+                this.player.mesh.position.z + 8
+            );
+            this.camera.position.lerp(idealCameraPos, 5 * deltaTime);
+            
+            const lookTarget = new THREE.Vector3(
+                this.player.mesh.position.x,
+                1.5,
+                this.player.mesh.position.z
+            );
+            this.camera.lookAt(lookTarget);
+            
+            this.uiManager.updateStamina(this.player.stamina);
+            
+            let promptText = null;
+            let interactionTarget = null;
+            let interactionType = null; 
 
-    update(deltaTime, inputKeys) {
-        const moveDir = new THREE.Vector3(0, 0, 0);
+            this.propsManager.props.forEach(dumpster => {
+                if (this.player.mesh.position.distanceTo(dumpster.position) < 2.5) {
+                    promptText = this.player.isHidden ? "Espacio - Salir" : "Espacio - Esconderse";
+                    interactionType = 'HIDE';
+                }
+            });
 
-        if (inputKeys.forward) moveDir.z -= 1;
-        if (inputKeys.backward) moveDir.z += 1;
-        if (inputKeys.left) moveDir.x -= 1;
-        if (inputKeys.right) moveDir.x += 1;
+            if (!this.player.isHidden) {
+                this.propsManager.trashBags.forEach((bag, index) => {
+                    if (this.player.mesh.position.distanceTo(bag.position) < 1.5) {
+                        promptText = "Espacio - Recolectar";
+                        interactionType = 'COLLECT';
+                        interactionTarget = { object: bag, index: index };
+                    }
+                });
+            }
 
-        if (moveDir.length() > 0) moveDir.normalize();
+            this.uiManager.showInteractPrompt(promptText);
 
-        let currentSpeed = this.speed;
-        this.isSprinting = false; 
-
-        if (inputKeys.sprint && this.stamina > 0 && moveDir.length() > 0) {
-            currentSpeed *= this.sprintMultiplier;
-            this.stamina -= 20 * deltaTime;
-            this.isSprinting = true;
-        } else if (this.stamina < 100) {
-            this.stamina += 10 * deltaTime;
+            if (interactionType && this.inputManager.keys.interact && !this.interactionCooldown) {
+                
+                if (interactionType === 'HIDE') {
+                    this.player.isHidden = !this.player.isHidden;
+                    this.player.mesh.visible = !this.player.isHidden;
+                    this.audioEngine.playHideSound();
+                } 
+                else if (interactionType === 'COLLECT') {
+                    this.scene.remove(interactionTarget.object);
+                    this.propsManager.trashBags.splice(interactionTarget.index, 1);
+                    
+                    this.score++;
+                    this.uiManager.updateScore(this.score, this.maxScore);
+                    this.audioEngine.playCollectSound();
+                }
+                
+                this.interactionCooldown = true;
+                setTimeout(() => this.interactionCooldown = false, 500);
+            }
         }
 
-        this.velocity.copy(moveDir).multiplyScalar(currentSpeed * deltaTime);
-        this.mesh.position.add(this.velocity);
-
-        if (moveDir.lengthSq() > 0.01) {
-            const targetAngle = Math.atan2(moveDir.x, moveDir.z);
-            const targetRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), targetAngle);
-            this.mesh.quaternion.slerp(targetRotation, 10 * deltaTime);
+        let anyAlert = false;
+        this.guards.forEach(guard => {
+            guard.update(deltaTime);
+            if (guard.state === 'ALERT') anyAlert = true;
+        });
+        
+        if (anyAlert && !this.wasAlertedLastFrame) {
+            this.audioEngine.playAlertSound();
         }
+        this.wasAlertedLastFrame = anyAlert;
+        
+        this.uiManager.setAlert(anyAlert);
+        
+        this.renderer.render(this.scene, this.camera);
     }
 }
