@@ -40,7 +40,7 @@ export class Player {
         const loader = new GLTFLoader();
         // Intentará buscar este archivo. ¡Si no lo tienes, fallará silenciosamente y seguirá usando los cubos!
         loader.load(
-            './media/models/raccoon.glb', 
+            './public/media/models/raccoon.glb', 
             (gltf) => {
                 const realModel = gltf.scene;
                 // Escalar el modelo (ajusta este valor según el modelo que descargues)
