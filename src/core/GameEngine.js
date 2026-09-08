@@ -5,7 +5,7 @@ import { InputManager } from '../systems/InputManager.js';
 import { Player } from '../entities/Player.js';
 import { PedestrianAI } from '../entities/PedestrianAI.js';
 import { UIManager } from '../ui/UIManager.js';
-import { AudioEngine } from '../systems/AudioEngine.js'; // NUEVO IMPORT
+import { AudioEngine } from '../systems/AudioEngine.js'; 
 
 export class GameEngine {
     constructor(containerId) {
@@ -22,10 +22,14 @@ export class GameEngine {
         this.player = null;
         this.guards = [];
         this.uiManager = null;
-        this.audioEngine = null; // NUEVO
+        this.audioEngine = null; 
         
         this.interactionCooldown = false;
-        this.wasAlertedLastFrame = false; // Control para no repetir el sonido 60 veces por segundo
+        this.wasAlertedLastFrame = false;
+        
+        // NUEVO: Variables de Puntuación
+        this.score = 0;
+        this.maxScore = 5; 
     }
 
     init() {
@@ -52,9 +56,8 @@ export class GameEngine {
 
         this.inputManager = new InputManager();
         this.uiManager = new UIManager();
-        this.audioEngine = new AudioEngine(); // Instanciamos el audio
+        this.audioEngine = new AudioEngine(); 
         this.player = new Player(this.scene);
-        this.player.isHidden = false; 
 
         const waypoints = [
             new THREE.Vector3(-10, 0, 8),
@@ -63,19 +66,15 @@ export class GameEngine {
         const guard1 = new PedestrianAI(this.scene, this.player, waypoints[0], waypoints);
         this.guards.push(guard1);
 
-        // --- SISTEMA DE INICIO (Menú) ---
         const startScreen = document.getElementById('start-screen');
         startScreen.addEventListener('click', async () => {
-            // Al hacer clic, activamos el audio, ocultamos el menú y arrancamos el juego
             await this.audioEngine.init();
             startScreen.style.opacity = '0';
             setTimeout(() => {
                 startScreen.style.display = 'none';
-                this.animate(); // Arrancamos el bucle SOLO cuando el usuario hace clic
+                this.animate();
             }, 500);
         });
-
-        console.log("🦝 Fase 6: Audio nativo preparado, esperando clic del usuario.");
     }
 
     _setupNightLighting() {
@@ -112,20 +111,51 @@ export class GameEngine {
             
             this.uiManager.updateStamina(this.player.stamina);
             
-            let canHide = false;
+            // LÓGICA DE INTERACCIONES (Esconderse o Recolectar)
+            let promptText = null;
+            let interactionTarget = null;
+            let interactionType = null; // 'HIDE' o 'COLLECT'
+
+            // 1. Revisar si hay basureros para esconderse
             this.propsManager.props.forEach(dumpster => {
                 if (this.player.mesh.position.distanceTo(dumpster.position) < 2.5) {
-                    canHide = true;
+                    promptText = this.player.isHidden ? "Espacio - Salir" : "Espacio - Esconderse";
+                    interactionType = 'HIDE';
                 }
             });
 
-            this.uiManager.showInteractPrompt(canHide && !this.player.isHidden);
+            // 2. Revisar si hay bolsas de basura para recoger (Solo si NO está escondido)
+            if (!this.player.isHidden) {
+                this.propsManager.trashBags.forEach((bag, index) => {
+                    if (this.player.mesh.position.distanceTo(bag.position) < 1.5) {
+                        promptText = "Espacio - Recolectar";
+                        interactionType = 'COLLECT';
+                        interactionTarget = { object: bag, index: index };
+                    }
+                });
+            }
 
-            if (canHide && this.inputManager.keys.interact && !this.interactionCooldown) {
-                this.player.isHidden = !this.player.isHidden;
-                this.player.mesh.visible = !this.player.isHidden;
+            // Mostrar el texto dinámico
+            this.uiManager.showInteractPrompt(promptText);
+
+            // EJECUTAR LA ACCIÓN AL PRESIONAR ESPACIO
+            if (interactionType && this.inputManager.keys.interact && !this.interactionCooldown) {
                 
-                this.audioEngine.playHideSound(); // Suena al meterse/salir del basurero
+                if (interactionType === 'HIDE') {
+                    this.player.isHidden = !this.player.isHidden;
+                    this.player.mesh.visible = !this.player.isHidden;
+                    this.audioEngine.playHideSound();
+                } 
+                else if (interactionType === 'COLLECT') {
+                    // Remover la bolsa de la escena
+                    this.scene.remove(interactionTarget.object);
+                    // Quitarla del arreglo para que no se pueda agarrar dos veces
+                    this.propsManager.trashBags.splice(interactionTarget.index, 1);
+                    
+                    this.score++;
+                    this.uiManager.updateScore(this.score, this.maxScore);
+                    this.audioEngine.playCollectSound();
+                }
                 
                 this.interactionCooldown = true;
                 setTimeout(() => this.interactionCooldown = false, 500);
@@ -138,7 +168,6 @@ export class GameEngine {
             if (guard.state === 'ALERT') anyAlert = true;
         });
         
-        // Lógica para que el sonido de alerta solo suene UNA VEZ al ser detectado
         if (anyAlert && !this.wasAlertedLastFrame) {
             this.audioEngine.playAlertSound();
         }
