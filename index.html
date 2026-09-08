@@ -5,13 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Trash Raccoon 4.0</title>
     <link rel="stylesheet" href="./src/ui/style.css">
+    
+    <!-- NUEVO: El mapa de importaciones. Resuelve el problema del GLTFLoader -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
 </head>
 <body>
     <div id="game-container"></div>
     
     <div id="ui-layer">
-        <div id="alert-text">¡DETECTADO!</div>
         <div id="score-text">Basura: 0 / 5</div>
+        <div id="alert-text">¡DETECTADO!</div>
         <div id="hud-bottom">
             <div id="interact-prompt">Espacio - Esconderse</div>
             <div id="stamina-container">
@@ -20,12 +30,12 @@
         </div>
     </div>
 
-    <!-- NUEVO: Pantalla de inicio para desbloquear el audio -->
     <div id="start-screen">
         <h1>TRASH RACCOON 4.0</h1>
         <p>Haz clic en la pantalla para empezar</p>
     </div>
 
-    <script type="module" src="./src/main.js?v=7"></script>
+    <!-- Subimos la versión para limpiar caché -->
+    <script type="module" src="./src/main.js?v=8"></script>
 </body>
 </html>
