@@ -1,4 +1,4 @@
-import { GameEngine } from './core/GameEngine.js';
+import { GameEngine } from './src/core/GameEngine.js';
 
 window.addEventListener('DOMContentLoaded', () => {
     // Instanciamos el motor apuntando al div del HTML
