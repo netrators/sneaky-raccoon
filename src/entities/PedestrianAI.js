@@ -41,27 +41,43 @@ export class PedestrianAI {
         this.scene.add(this.mesh);
     }
 
-    update(deltaTime) {
+   update(deltaTime) {
         if (!this.player) return;
+
+        // NUEVO: Si el jugador se escondió, pierde el interés
+        if (this.player.isHidden) {
+            if (this.state === 'ALERT') {
+                this.state = 'PATROL';
+                this.flashlight.color.setHex(0xffffff); // Linterna blanca
+                this.speed = 2.0;
+            }
+        }
 
         const distanceToPlayer = this.mesh.position.distanceTo(this.player.mesh.position);
 
-        // 1. Detección por Sonido (Si el mapache corre cerca)
-        if (this.player.isSprinting && distanceToPlayer < this.hearingRange) {
-            this.state = 'ALERT';
+        // Solo detectamos si el jugador NO está escondido
+        if (!this.player.isHidden) {
+            if (this.player.isSprinting && distanceToPlayer < this.hearingRange) {
+                this.state = 'ALERT';
+            }
+
+            const dirToPlayer = new THREE.Vector3().subVectors(this.player.mesh.position, this.mesh.position).normalize();
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion).normalize();
+            const angleToPlayer = forward.angleTo(dirToPlayer);
+
+            if (distanceToPlayer < this.visionRange && angleToPlayer < this.visionAngle) {
+                this.state = 'ALERT';
+            }
         }
 
-        // 2. Detección por Luz (Cono de visión)
-        // Calculamos el vector dirección desde el guardia hacia el jugador
-        const dirToPlayer = new THREE.Vector3().subVectors(this.player.mesh.position, this.mesh.position).normalize();
-        // Calculamos hacia dónde está mirando el guardia actualmente
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion).normalize();
-        // Comparamos el ángulo entre ambos vectores
-        const angleToPlayer = forward.angleTo(dirToPlayer);
-
-        if (distanceToPlayer < this.visionRange && angleToPlayer < this.visionAngle) {
-            this.state = 'ALERT';
+        if (this.state === 'PATROL') {
+            this.patrol(deltaTime);
+        } else if (this.state === 'ALERT') {
+            this.flashlight.color.setHex(0xff0000);
+            this.speed = 3.5;
+            this.moveTo(this.player.mesh.position, deltaTime);
         }
+    }
 
         // 3. Máquina de Estados (Actuar según lo detectado)
         if (this.state === 'PATROL') {
