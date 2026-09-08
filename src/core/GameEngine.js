@@ -34,7 +34,8 @@ export class GameEngine {
 
     init() {
         this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.FogExp2(0x8c5b3f, 0.025);
+        // Niebla azul cielo brillante, mucho más suave para ver más lejos
+        this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
         this.camera.position.set(0, 15, 15);
@@ -43,13 +44,16 @@ export class GameEngine {
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        
+        // --- MEJORA DE GRÁFICOS ---
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
         this.container.appendChild(this.renderer.domElement);
-
         window.addEventListener('resize', this.onWindowResize.bind(this));
 
-        this._setupNightLighting();
+        // Llamamos a la nueva función de luz de día
+        this._setupDayLighting();
         
         this.propsManager = new PropsManager(this.scene);
         this.propsManager.buildAlley();
@@ -77,21 +81,25 @@ export class GameEngine {
         });
     }
 
-   _setupNightLighting() { // (Aunque se llame nightLighting, ahora es de tarde)
-        // Luz ambiental: Naranja cálido y más brillante para que se vea todo el callejón
-        const ambientLight = new THREE.AmbientLight(0xffaa55, 1.0); 
+    _setupDayLighting() {
+        // Luz ambiental blanca y potente (llena todo de luz)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); 
         this.scene.add(ambientLight);
 
-        // Luz del Sol (Atardecer dorado)
-        const sunLight = new THREE.DirectionalLight(0xffddaa, 1.2);
-        // Posicionamos el sol más bajo en el horizonte (Y=10 en lugar de 20)
-        sunLight.position.set(-15, 10, -10); 
+        // El Sol: Luz directa desde arriba a la derecha
+        const sunLight = new THREE.DirectionalLight(0xfffaee, 1.5); // Ligeramente amarillenta
+        sunLight.position.set(20, 30, 10); 
         sunLight.castShadow = true;
         
-        sunLight.shadow.camera.left = -20;
-        sunLight.shadow.camera.right = 20;
-        sunLight.shadow.camera.top = 20;
-        sunLight.shadow.camera.bottom = -20;
+        // Mejoramos la resolución de las sombras (Gráficos más altos)
+        sunLight.shadow.mapSize.width = 2048; 
+        sunLight.shadow.mapSize.height = 2048;
+        
+        // Expandimos el área que recibe sombras
+        sunLight.shadow.camera.left = -30;
+        sunLight.shadow.camera.right = 30;
+        sunLight.shadow.camera.top = 30;
+        sunLight.shadow.camera.bottom = -30;
         
         this.scene.add(sunLight);
     }
