@@ -86,4 +86,19 @@ export class AudioEngine {
         osc.start();
         osc.stop(this.ctx.currentTime + 0.2);
     }
+    playCollectSound() {
+        if (!this.isInitialized) return;
+        // Sonido de "campanita" / recompensa al agarrar basura
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.3);
+    }
 }
