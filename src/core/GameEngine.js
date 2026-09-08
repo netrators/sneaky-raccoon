@@ -77,17 +77,23 @@ export class GameEngine {
         });
     }
 
-    _setupNightLighting() {
-        const ambientLight = new THREE.AmbientLight(0x101525, 0.5); 
+   _setupNightLighting() { // (Aunque se llame nightLighting, ahora es de tarde)
+        // Luz ambiental: Naranja cálido y más brillante para que se vea todo el callejón
+        const ambientLight = new THREE.AmbientLight(0xffaa55, 1.0); 
         this.scene.add(ambientLight);
-        const moonLight = new THREE.DirectionalLight(0x88aaff, 0.8);
-        moonLight.position.set(-10, 20, -10);
-        moonLight.castShadow = true;
-        moonLight.shadow.camera.left = -20;
-        moonLight.shadow.camera.right = 20;
-        moonLight.shadow.camera.top = 20;
-        moonLight.shadow.camera.bottom = -20;
-        this.scene.add(moonLight);
+
+        // Luz del Sol (Atardecer dorado)
+        const sunLight = new THREE.DirectionalLight(0xffddaa, 1.2);
+        // Posicionamos el sol más bajo en el horizonte (Y=10 en lugar de 20)
+        sunLight.position.set(-15, 10, -10); 
+        sunLight.castShadow = true;
+        
+        sunLight.shadow.camera.left = -20;
+        sunLight.shadow.camera.right = 20;
+        sunLight.shadow.camera.top = 20;
+        sunLight.shadow.camera.bottom = -20;
+        
+        this.scene.add(sunLight);
     }
 
     onWindowResize() {
