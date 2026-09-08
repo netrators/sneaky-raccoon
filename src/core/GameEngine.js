@@ -4,7 +4,8 @@ import { PropsManager } from '../entities/Props.js';
 import { InputManager } from '../systems/InputManager.js';
 import { Player } from '../entities/Player.js';
 import { PedestrianAI } from '../entities/PedestrianAI.js';
-import { UIManager } from '../ui/UIManager.js'; // NUEVO IMPORT
+import { UIManager } from '../ui/UIManager.js';
+import { AudioEngine } from '../systems/AudioEngine.js'; // NUEVO IMPORT
 
 export class GameEngine {
     constructor(containerId) {
@@ -20,9 +21,11 @@ export class GameEngine {
         this.inputManager = null;
         this.player = null;
         this.guards = [];
-        this.uiManager = null; // NUEVO
+        this.uiManager = null;
+        this.audioEngine = null; // NUEVO
         
-        this.interactionCooldown = false; // Evita spamear el botón de esconderse
+        this.interactionCooldown = false;
+        this.wasAlertedLastFrame = false; // Control para no repetir el sonido 60 veces por segundo
     }
 
     init() {
@@ -48,9 +51,9 @@ export class GameEngine {
         this.propsManager.buildAlley();
 
         this.inputManager = new InputManager();
-        this.uiManager = new UIManager(); // Iniciamos la UI
+        this.uiManager = new UIManager();
+        this.audioEngine = new AudioEngine(); // Instanciamos el audio
         this.player = new Player(this.scene);
-        // Inicializamos al mapache como NO escondido
         this.player.isHidden = false; 
 
         const waypoints = [
@@ -60,8 +63,19 @@ export class GameEngine {
         const guard1 = new PedestrianAI(this.scene, this.player, waypoints[0], waypoints);
         this.guards.push(guard1);
 
-        this.animate();
-        console.log("🦝 Fase 5: UI y Mecánicas de Sigilo integradas");
+        // --- SISTEMA DE INICIO (Menú) ---
+        const startScreen = document.getElementById('start-screen');
+        startScreen.addEventListener('click', async () => {
+            // Al hacer clic, activamos el audio, ocultamos el menú y arrancamos el juego
+            await this.audioEngine.init();
+            startScreen.style.opacity = '0';
+            setTimeout(() => {
+                startScreen.style.display = 'none';
+                this.animate(); // Arrancamos el bucle SOLO cuando el usuario hace clic
+            }, 500);
+        });
+
+        console.log("🦝 Fase 6: Audio nativo preparado, esperando clic del usuario.");
     }
 
     _setupNightLighting() {
@@ -89,7 +103,6 @@ export class GameEngine {
         const deltaTime = this.clock.getDelta();
         
         if (this.player && this.inputManager) {
-            // Solo se mueve si no está escondido
             if (!this.player.isHidden) {
                 this.player.update(deltaTime, this.inputManager.keys);
             }
@@ -97,39 +110,40 @@ export class GameEngine {
             this.camera.position.lerp(new THREE.Vector3(this.player.mesh.position.x, 15, this.player.mesh.position.z + 10), 5 * deltaTime);
             this.camera.lookAt(this.player.mesh.position);
             
-            // --- ACTUALIZAR UI DE ESTAMINA ---
             this.uiManager.updateStamina(this.player.stamina);
             
-            // --- MECÁNICA DE ESCONDERSE ---
             let canHide = false;
-            // Revisamos si hay un contenedor (dumpster) cerca (menos de 2.5 metros)
             this.propsManager.props.forEach(dumpster => {
                 if (this.player.mesh.position.distanceTo(dumpster.position) < 2.5) {
                     canHide = true;
                 }
             });
 
-            // Mostramos el texto en pantalla si puede esconderse y aún no lo está
             this.uiManager.showInteractPrompt(canHide && !this.player.isHidden);
 
-            // Si presiona espacio cerca de un contenedor
             if (canHide && this.inputManager.keys.interact && !this.interactionCooldown) {
-                this.player.isHidden = !this.player.isHidden; // Cambia el estado
-                this.player.mesh.visible = !this.player.isHidden; // Oculta el modelo 3D
+                this.player.isHidden = !this.player.isHidden;
+                this.player.mesh.visible = !this.player.isHidden;
+                
+                this.audioEngine.playHideSound(); // Suena al meterse/salir del basurero
                 
                 this.interactionCooldown = true;
-                setTimeout(() => this.interactionCooldown = false, 500); // Medio segundo antes de poder salir
+                setTimeout(() => this.interactionCooldown = false, 500);
             }
         }
 
-        // --- ACTUALIZAR GUARDIAS Y UI DE ALERTA ---
         let anyAlert = false;
         this.guards.forEach(guard => {
             guard.update(deltaTime);
             if (guard.state === 'ALERT') anyAlert = true;
         });
         
-        // Si al menos un guardia nos vio, muestra la palabra ¡DETECTADO!
+        // Lógica para que el sonido de alerta solo suene UNA VEZ al ser detectado
+        if (anyAlert && !this.wasAlertedLastFrame) {
+            this.audioEngine.playAlertSound();
+        }
+        this.wasAlertedLastFrame = anyAlert;
+        
         this.uiManager.setAlert(anyAlert);
         
         this.renderer.render(this.scene, this.camera);
