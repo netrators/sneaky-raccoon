@@ -1,6 +1,5 @@
-// src/entities/Player.js
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
 export class Player {
     constructor(scene) {
@@ -11,10 +10,8 @@ export class Player {
         this.isSprinting = false;
         this.isHidden = false;
         this.velocity = new THREE.Vector3();
-        
-        // Creamos la figura procedural como "Plan B"
+
         this._buildProceduralModel();
-        // Intentamos cargar el modelo real (Plan A)
         this._loadRealModel();
     }
 
@@ -22,7 +19,7 @@ export class Player {
         this.mesh = new THREE.Group();
         this.mesh.position.set(0, 0.5, 0);
 
-        this.fallbackBody = new THREE.Group(); // Agrupamos la geometría para ocultarla fácil luego
+        this.fallbackBody = new THREE.Group();
         const bodyMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
         const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.5, 4, 8), bodyMat);
         body.rotation.x = Math.PI / 2; body.position.y = 0.2; body.castShadow = true;
@@ -39,27 +36,19 @@ export class Player {
     _loadRealModel() {
         const loader = new GLTFLoader();
         loader.load(
-            './public/media/models/raccoon.glb', // <--- ¡AÑADIMOS /public/ AQUÍ!
-            (gltf) =>
+            './public/media/models/raccoon.glb',
+            (gltf) => {
                 const realModel = gltf.scene;
-                // Escalar el modelo (ajusta este valor según el modelo que descargues)
                 realModel.scale.set(0.5, 0.5, 0.5); 
-                
-                // Activar sombras en el modelo nuevo
                 realModel.traverse((child) => {
                     if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
                 });
-
-                // Ocultar nuestro modelo procedural de cubos
                 this.fallbackBody.visible = false;
-                
-                // Añadir el modelo 3D real
                 this.mesh.add(realModel);
                 console.log("¡Modelo de mapache 3D cargado con éxito!");
             },
-            undefined, // Progreso de carga
+            undefined,
             (error) => {
-                // Si falla (porque no has creado la carpeta o descargado el modelo aún)
                 console.log("No se encontró el modelo 3D del mapache. Usando geometría procedural por ahora.");
             }
         );
