@@ -7,7 +7,18 @@
     <link rel="stylesheet" href="./src/ui/style.css">
 </head>
 <body>
+    <!-- Capa del Juego 3D -->
     <div id="game-container"></div>
-    <script type="module" src="./src/main.js?v=3"></script>
+    
+    <!-- Capa de Interfaz Gráfica (HUD) -->
+    <div id="ui-layer">
+        <div id="alert-text">¡DETECTADO!</div>
+        <div id="stamina-container">
+            <div id="stamina-bar"></div>
+        </div>
+        <div id="interact-prompt">Espacio - Esconderse</div>
+    </div>
+
+    <script type="module" src="./src/main.js?v=4"></script>
 </body>
 </html>
