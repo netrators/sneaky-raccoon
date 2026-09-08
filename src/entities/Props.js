@@ -8,49 +8,36 @@ export class PropsManager {
         this.trashBags = []; 
     }
 
-    buildAlley() {
-        // Suelo un poco más claro
-        const floorGeo = new THREE.PlaneGeometry(50, 80);
-        const floorMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+    // src/entities/Props.js
+    buildWorld() { // Cambiamos el nombre de buildAlley a buildWorld
+        // Un suelo gigantesco verde oscuro (simulando pasto)
+        const floorGeo = new THREE.PlaneGeometry(150, 150);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e, roughness: 1.0 });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         this.scene.add(floor);
 
-        // Muros
-        const wallGeo = new THREE.BoxGeometry(1, 10, 60);
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x555555 }); 
-        const leftWall = new THREE.Mesh(wallGeo, wallMat);
-        leftWall.position.set(-15, 5, 0);
-        leftWall.castShadow = true; leftWall.receiveShadow = true;
-        this.scene.add(leftWall);
-        
-        const rightWall = new THREE.Mesh(wallGeo, wallMat);
-        rightWall.position.set(15, 5, 0);
-        rightWall.castShadow = true; rightWall.receiveShadow = true;
-        this.scene.add(rightWall);
+        // Generar 50 Árboles aleatorios
+        for (let i = 0; i < 50; i++) {
+            const rx = (Math.random() - 0.5) * 120; // Posición X aleatoria entre -60 y 60
+            const rz = (Math.random() - 0.5) * 120; // Posición Z aleatoria entre -60 y 60
+            this.createTree(rx, 0, rz);
+        }
 
-        // Contenedores
-        this.createDumpster(-12, 1, -10);
-        this.createDumpster(12, 1, 5);
-        this.createDumpster(-12, 1, 15);
+        // Generar 10 Contenedores para esconderse
+        for (let i = 0; i < 10; i++) {
+            const rx = (Math.random() - 0.5) * 100;
+            const rz = (Math.random() - 0.5) * 100;
+            this.createDumpster(rx, 1, rz);
+        }
 
-        // Farolas (Ahora apagadas por ser de día)
-        this.createStreetLight(-14, 6, -5);
-        this.createStreetLight(14, 6, 10);
-
-        // --- NUEVO: Añadir árboles (Low Poly) ---
-        this.createTree(-14, 0, 2);
-        this.createTree(14, 0, -8);
-        this.createTree(-14, 0, 22);
-        this.createTree(14, 0, 18);
-
-        // Bolsas de basura
-        this.createTrashBag(-10, 0, -2);
-        this.createTrashBag(10, 0, 15);
-        this.createTrashBag(0, 0, 20);
-        this.createTrashBag(12, 0, -8);
-        this.createTrashBag(-5, 0, 10);
+        // Generar 15 Bolsas de basura (objetivos)
+        for (let i = 0; i < 15; i++) {
+            const rx = (Math.random() - 0.5) * 100;
+            const rz = (Math.random() - 0.5) * 100;
+            this.createTrashBag(rx, 0, rz);
+        }
     }
 
     createTree(x, y, z) {
